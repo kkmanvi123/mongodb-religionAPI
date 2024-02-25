@@ -1,0 +1,10 @@
+One of our API methods allows users to generate a Folium heatmap of places
+of worship based on religion, and for the visual included we filtered based
+on Buddhist institutions. While every other religion included in this dataset
+had the largest hub of institutions in New York City, we noticed that this
+pattern did not follow for those under the Buddhist category. Buddhism seems
+to have the most concentrated hub in Southern California, specifically the
+Los Angeles metropolitan area. After further research, we learned that
+historical immigration from East and Southeast Asian countries has influenced
+the spread of Buddhism in this region, which now holds the largest Buddhist
+temple outside Asia with over 75% of members being non-Asian.

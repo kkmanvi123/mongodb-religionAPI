@@ -1,0 +1,135 @@
+Questions:
+1. What are all the unique places of worship (e.g., churches, mosques, synagogues) present in the dataset, and
+how many of each type are there?
+    db.worship.aggregate([{$group:{_id:"$other_info.naics.description", count:{$sum:1}}}])
+    [
+      { _id: 'TEMPLES, RELIGIOUS', count: 422 },
+      { _id: 'SHRINES, RELIGIOUS', count: 31 },
+      { _id: 'MOSQUES, RELIGIOUS', count: 1251 },
+      { _id: 'SYNAGOGUES', count: 3256 },
+      { _id: 'CHURCHES', count: 42657 },
+      { _id: 'CONVENTS (EXCEPT SCHOOLS)', count: 9 },
+      { _id: 'MONASTERIES (EXCEPT SCHOOLS)', count: 50 },
+      { _id: 'RETREAT HOUSES, RELIGIOUS', count: 10 },
+      { _id: 'PLACES OF WORSHIP', count: 1642 }
+    ]
+
+2. What are the 5 churches with the highest ratio of average attendance to members in Massachusetts?
+    db.worship.aggregate([{ $match: {"other_info.naics.description":"CHURCHES", "location_info.address.state":"MA", "institution_info.denomination.attendance": { $exists: true, $ne: "NOT AVAILABLE" }, "institution_info.denomination.members": { $exists: true, $ne: "NOT AVAILABLE" }}}, { $project: { "institution_info.name": 1, "ratio": { $divide: [{ $toDouble: "$institution_info.denomination.attendance" }, { $toDouble: "$institution_info.denomination.members" }]}, "_id": 0}}, { $sort: { "ratio": -1 }}, { $limit: 5}])
+    [
+      { "institution_info": { "name": "OLD SOUTH CHURCH IN BOSTON" }, "ratio": 0.6738703339882122 }
+      { "institution_info": { "name": "DANE STREET CHURCH" }, "ratio": 0.5938242280285035 }
+      { "institution_info": { "name": "THE CONGREGATIONAL CHURCH OF NEEDHAM" }, "ratio": 0.45454545454545453 }
+      { "institution_info": { "name": "DENNIS UNION CHURCH" }, "ratio": 0.45308924485125857 }
+      { "institution_info": { "name": "SOUTH CHURCH IN ANDOVER" }, "ratio": 0.44787644787644787 }
+    ]
+
+3. What are the top 10 cities with the highest number of places of worship, regardless of their type?
+    db.worship.aggregate([{ $group: { _id: "$location_info.address.city", count: { $sum: 1 } } }, { $sort: { count: -1 } }, { $limit: 10 }])
+    [
+      { _id: 'CHICAGO', count: 571 },
+      { _id: 'PHILADELPHIA', count: 493 },
+      { _id: 'BROOKLYN', count: 452 },
+      { _id: 'SALT LAKE CITY', count: 403 },
+      { _id: 'HOUSTON', count: 396 },
+      { _id: 'LOS ANGELES', count: 379 },
+      { _id: 'NEW YORK', count: 376 },
+      { _id: 'WASHINGTON', count: 306 },
+      { _id: 'DETROIT', count: 265 },
+      { _id: 'BALTIMORE', count: 256 }
+    ]
+
+4. How many religions are practiced in each state, categorized by their type?
+    db.worship.aggregate([{ $group: { _id: { state: "$location_info.address.state", type: "$institution_info.subtype" }, count: { $sum: 1 } } }, { $group: { _id: "$_id.state", types: { $push: { type: "$_id.type", count: "$count" } } } }])
+    [
+     {"WY": {"BUDDHIST": 3, "CHRISTIAN": 134, "MUSLIM": 2, "JUDAIC": 2}},
+     {"NC": {"HINDU": 6, "CHRISTIAN": 2026, "OTHER": 5, "MUSLIM": 27, "JUDAIC": 33, "BUDDHIST": 42}},
+     {"ND": {"MUSLIM": 2, "CHRISTIAN": 71, "BUDDHIST": 1, "JUDAIC": 3}},
+     {"AR": {"HINDU": 2, "JUDAIC": 11, "MUSLIM": 5, "BUDDHIST": 8, "CHRISTIAN": 586}},
+     {"MI": {"CHRISTIAN": 1476, "MUSLIM": 52, "OTHER": 7, "BUDDHIST": 28, "HINDU": 3, "JUDAIC": 72}},
+     {"MD": {"JUDAIC": 67, "HINDU": 13, "BUDDHIST": 35, "MUSLIM": 32, "CHRISTIAN": 655, "OTHER": 5}},
+     {"AZ": {"CHRISTIAN": 834, "BUDDHIST": 49, "HINDU": 5, "MUSLIM": 14, "JUDAIC": 53, "OTHER": 1}},
+     {"CT": {"JUDAIC": 109, "BUDDHIST": 30, "MUSLIM": 28, "OTHER": 5, "HINDU": 3, "CHRISTIAN": 505}},
+     {"VI": {"CHRISTIAN": 5, "JUDAIC": 1}},
+     {"WI": {"CHRISTIAN": 630, "MUSLIM": 15, "HINDU": 3, "OTHER": 3, "JUDAIC": 33, "BUDDHIST": 48}}
+    ]
+
+5. What is the distribution of denominations among churches in different states? Show the top 3 in each state.
+    db.worship.aggregate([{ $match: { "institution_info.subtype": "CHRISTIAN", "institution_info.denomination.name": { $ne: "NOT AVAILABLE" } } }, { $group: { _id: { state: "$location_info.address.state", denomination: "$institution_info.denomination.name" }, count: { $sum: 1 } } }, { $sort: { "_id.state": 1, count: -1 } }, { $group: { _id: "$_id.state", denominations: { $push: { name: "$_id.denomination", count: "$count" } } } }, { $project: { _id: 1, denominations: { $slice: ["$denominations", 3] } } }])
+    [
+      {"_id":"VT","denominations":[{"name":"ABC","count":56},{"name":"BAPT","count":16},{"name":"UCC","count":3}]},
+      {"_id":"KY","denominations":[{"name":"BAPT","count":241},{"name":"SBC","count":195},{"name":"AME","count":51}]},
+      {"_id":"IN","denominations":[{"name":"ABC","count":331},{"name":"BAPT","count":257},{"name":"CHRISTIAN","count":67}]},
+      {"_id":"MA","denominations":[{"name":"ABC","count":249},{"name":"BAPT","count":84},{"name":"EPIS","count":27}]},
+      {"_id":"NJ","denominations":[{"name":"ABC","count":225},{"name":"NBC","count":157},{"name":"AME","count":97}]},
+      {"_id":"PA","denominations":[{"name":"ABC","count":377},{"name":"BAPT","count":309},{"name":"NBC","count":144}]},
+      {"_id":"MD","denominations":[{"name":"AME","count":114},{"name":"BAPT","count":83},{"name":"ABC","count":79}]},
+      {"_id":"AZ","denominations":[{"name":"LDS","count":404},{"name":"BAPT","count":114},{"name":"SBC","count":29}]},
+      {"_id":"DE","denominations":[{"name":"AME","count":30},{"name":"BAPT","count":23},{"name":"ABC","count":12}]},
+      {"_id":"AL","denominations":[{"name":"NBC","count":320},{"name":"SBC","count":317},{"name":"AME","count":252}]}
+    ]
+
+6. Which state is most densely packed with places of worship to population (shown as places/10000 people)?
+    db.worship.aggregate([{ $group: { _id: "$location_info.address.state", count: { $sum: 1 }, state_pop: { $first: "$location_info.state_pop" }}}, { $project: { state: "_id", ratio: { $multiply: [{ $divide: ["$count", "$state_pop"] }, 10000] }}}, { $sort: { ratio: -1}}, { $limit: 1}])
+    [ { _id: 'WV', state: '_id', ratio: 3.5501812744074965 } ]
+
+7. What places of worship are located within 50 miles (rounded to 80,000 meters) of Boston?
+    db.worship.createIndex({'location_info.coordinates':"2dsphere"}) // create the index to query on
+    db.worship.find( { "location_info.coordinates": { $near: { $geometry: { type: "Point", coordinates: [-71.0589, 42.3601] }, $maxDistance: 80000 } } }, { "location_info.address.city": 1, "location_info.address.street": 1, _id: 0 } )
+    [
+      {location_info: { address: { street: '15SCHOOLSTREET', city: 'BOSTON' } }},
+      { location_info: { address: { street: '88TREMONTSTREET', city: 'BOSTON' } }},
+      { location_info: { address: { street: '35BOWDOINSTREET', city: 'BOSTON' } }},
+      { location_info: { address: { street: '38TEMPLESTREET', city: 'BOSTON' } }},
+      { location_info: { address: { street: '1PARKSTREET', city: 'BOSTON' } }},
+      { location_info: { address: { street: '138TREMONTSTREET', city: 'BOSTON' } }},
+      { location_info: { address: { street: '68WILLIAMCARDINALOCONNELLWAY', city: 'BOSTON' } }},
+      { location_info: { address: { street: '31PRINCESTREET', city: 'BOSTON' } }},
+      { location_info: { address: { street: '24CLARKSTREET', city: 'BOSTON' } }},
+      { location_info: { address: { street: '193SALEMSTREET', city: 'BOSTON' } }}
+    ]
+
+8. What are the ten church denominations with the highest average attendance?
+    db.worship.aggregate([{ $match: {"institution_info.denomination.attendance": { $exists: true, $ne: "NOT AVAILABLE" }, "other_info.naics.description":"CHURCHES"}}, { $group: { _id: "$institution_info.denomination.name", averageAttendance: { $avg: { $toDouble: "$institution_info.denomination.attendance"}}}}, { $sort: { "averageAttendance":-1}}, { $limit:10}])
+    [
+      { _id: 'PAW', averageAttendance: 6500 },
+      { _id: 'COGIC', averageAttendance: 6166.666666666667 },
+      { _id: 'COG', averageAttendance: 4875 },
+      { _id: 'EC', averageAttendance: 4779.5 },
+      { _id: 'CAL', averageAttendance: 4544 },
+      { _id: 'PENT', averageAttendance: 4250 },
+      { _id: 'NONDENOM', averageAttendance: 4093.5924657534247 },
+      { _id: 'PNB', averageAttendance: 4083.3333333333335 },
+      { _id: 'IPHC', averageAttendance: 4000 },
+      { _id: 'EPC', averageAttendance: 3875 }
+    ]
+
+9. How many unique denominations does each state have?
+    db.worship.aggregate([{ $group: { _id: { state: "$location_info.address.state", denomination: "$institution_info.denomination.name" }, count: { $sum: 1 } } }, { $group: { _id: "$_id.state", uniqueDenominations: { $sum: { $cond: [{ $eq: ["$count", 1] }, 1, 0] } } } }, { $sort: { uniqueDenominations: -1 } }, { $limit: 10 }])
+    [
+      { _id: 'CA', uniqueDenominations: 122 },
+      { _id: 'NY', uniqueDenominations: 58 },
+      { _id: 'IL', uniqueDenominations: 58 },
+      { _id: 'TX', uniqueDenominations: 49 },
+      { _id: 'FL', uniqueDenominations: 48 },
+      { _id: 'AZ', uniqueDenominations: 45 },
+      { _id: 'WA', uniqueDenominations: 42 },
+      { _id: 'MA', uniqueDenominations: 41 },
+      { _id: 'HI', uniqueDenominations: 34 },
+      { _id: 'PA', uniqueDenominations: 33 }
+    ]
+
+10. What are the top 10 places of worship (list their names) with the highest membership rates, regardless of type?
+    db.worship.aggregate([{ $match: { "institution_info.denomination.members": { $type: "string" }, $expr: { $regexMatch: { input: "$institution_info.denomination.members", regex: /^[0-9]+$/ } } } }, { $addFields: { membersInt: { $toInt: { $cond: { if: { $eq: [{ $type: "$institution_info.denomination.members" }, "string"] }, then: { $arrayElemAt: [{ $split: ["$institution_info.denomination.members", " "] }, 0] }, else: "$institution_info.denomination.members" } } } } }, { $group: { _id: { naics_description: "$other_info.naics.description", name: "$institution_info.name" }, maxMembers: { $max: "$membersInt" } } }, { $sort: { maxMembers: -1 } }])
+    [
+      { "_id": { "naics_description": "CHURCHES", "name": "LOVELAND BAPTIST CHURCH" }, "maxMembers": 9078 }
+      { "_id": { "naics_description": "CHURCHES", "name": "FIRST BAPTIST CHURCH" }, "maxMembers": 9000 }
+      { "_id": { "naics_description": "CHURCHES", "name": "BROOKHOLLOW BAPTIST CHURCH - NORTHWEST CAMPUS" }, "maxMembers": 8745 }
+      { "_id": { "naics_description": "CHURCHES", "name": "EXCITING IDLEWILD BAPTIST CHURCH" }, "maxMembers": 8500 }
+      { "_id": { "naics_description": "CHURCHES", "name": "SAINT MARK MISSIONARY BAPTIST CHURCH" }, "maxMembers": 8500 }
+      { "_id": { "naics_description": "CHURCHES", "name": "GRACE FELLOWSHIP" }, "maxMembers": 7200 }
+      { "_id": { "naics_description": "CHURCHES", "name": "FIRST BAPTIST CHURCH - TULSA" }, "maxMembers": 6548 }
+      { "_id": { "naics_description": "CHURCHES", "name": "TRINITY BAPTIST CHURCH" }, "maxMembers": 6511 }
+      { "_id": { "naics_description": "CHURCHES", "name": "WESTSIDE BAPTIST CHURCH" }, "maxMembers": 6495 }
+      { "_id": { "naics_description": "CHURCHES", "name": "METROPOLITAN BAPTIST CHURCH (THE MET)" }, "maxMembers": 6252 }
+    ]
